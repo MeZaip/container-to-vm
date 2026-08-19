@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: container-to-vm
-Version: 0.1.0
-Summary: Convert Docker/OCI container filesystems into bootable virtual machines.
-Requires-Python: >=3.10
