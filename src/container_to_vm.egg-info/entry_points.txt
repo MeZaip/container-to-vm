@@ -1,0 +1,2 @@
+[console_scripts]
+container2vm = container2vm.cli:main

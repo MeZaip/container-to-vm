@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "container-to-vm"
+version = "0.1.0"
+description = "Convert Docker/OCI container filesystems into bootable virtual machines."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+container2vm = "container2vm.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
