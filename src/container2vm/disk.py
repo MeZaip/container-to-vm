@@ -70,8 +70,23 @@ def build_disk(rootfs: Path, output: Path) -> None:
         format_ext4(raw_image)
 
         mount_image(raw_image, mount_point)
-
         copy_rootfs(rootfs, mount_point)
+
+        unmount_image(mount_point)
+
+        subprocess.run(
+            [
+                "qemu-img",
+                "convert",
+                "-f",
+                "raw",
+                "-O",
+                "qcow2",
+                str(raw_image),
+                str(output),
+            ],
+            check=True,
+        )
 
     finally:
         subprocess.run(
@@ -79,18 +94,5 @@ def build_disk(rootfs: Path, output: Path) -> None:
             check=False,
         )
 
-    subprocess.run(
-        [
-            "qemu-img",
-            "convert",
-            "-f",
-            "raw",
-            "-O",
-            "qcow2",
-            str(raw_image),
-            str(output),
-        ],
-        check=True,
-    )
-
-    raw_image.unlink()
+        if raw_image.exists():
+            raw_image.unlink()

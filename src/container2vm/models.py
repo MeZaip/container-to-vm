@@ -2,6 +2,13 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class VMConfig:
+    hostname: str = "container-vm"
+    username: str | None = None
+    password: str | None = None
+
+
+@dataclass
 class ContainerConfig:
     entrypoint: list[str] = field(default_factory=list)
     cmd: list[str] = field(default_factory=list)
