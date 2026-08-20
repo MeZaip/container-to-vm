@@ -1,7 +1,7 @@
 import argparse
 
-from .container import inspect_image
-
+from .container import extract_image, inspect_image
+from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(
@@ -20,11 +20,31 @@ def main():
         help="Container image to inspect.",
     )
 
+    extract_parser = subparsers.add_parser(
+    "extract",
+    help="Extract a container filesystem.",
+    )
+
+    extract_parser.add_argument(
+        "image",
+        help="Container image to extract.",
+    )
+
+    extract_parser.add_argument(
+        "output",
+        help="Directory where the filesystem will be extracted.",
+    )
+
     args = parser.parse_args()
 
     if args.command == "inspect":
         try:
             inspect_container(args.image)
+        except Exception as error:
+            parser.error(str(error))
+    elif args.command == "extract":
+        try:
+            extract_image(args.image, Path(args.output))
         except Exception as error:
             parser.error(str(error))
 

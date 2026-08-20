@@ -1,5 +1,7 @@
 import json
 import subprocess
+import tarfile
+from pathlib import Path
 
 from .models import ContainerConfig, ContainerInfo
 
@@ -46,3 +48,41 @@ def inspect_image(image: str) -> ContainerInfo:
         size=image_data.get("Size", 0),
         config=container_config,
     )
+
+
+def extract_image(image: str, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    create_result = subprocess.run(
+        ["docker", "create", image],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    container_id = create_result.stdout.strip()
+
+    if not container_id:
+        raise RuntimeError("Docker did not return a container ID.")
+
+    try:
+        archive_path = output_dir / "rootfs.tar"
+
+        with archive_path.open("wb") as archive:
+            subprocess.run(
+                ["docker", "export", container_id],
+                stdout=archive,
+                check=True,
+            )
+
+        with tarfile.open(archive_path) as tar:
+            tar.extractall(output_dir)
+
+        archive_path.unlink()
+
+    finally:
+        subprocess.run(
+            ["docker", "rm", container_id],
+            capture_output=True,
+            check=False,
+        )
