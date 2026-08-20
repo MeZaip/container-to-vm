@@ -1,7 +1,9 @@
 import argparse
 
-from .container import extract_image, inspect_image
 from pathlib import Path
+
+from .container import extract_image, inspect_image
+from .debian import build_rootfs
 
 def main():
     parser = argparse.ArgumentParser(
@@ -35,6 +37,17 @@ def main():
         help="Directory where the filesystem will be extracted.",
     )
 
+    build_parser = subparsers.add_parser(
+    "build-base",
+    help="Build a minimal Debian root filesystem.",
+    )
+
+    build_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output directory for the Debian root filesystem.",
+    )
+
     args = parser.parse_args()
 
     if args.command == "inspect":
@@ -47,7 +60,12 @@ def main():
             extract_image(args.image, Path(args.output))
         except Exception as error:
             parser.error(str(error))
-
+    elif args.command == "build-base":
+        try:
+            build_rootfs(Path(args.output))
+            print(f"Debian base system created at: {args.output}")
+        except Exception as error:
+            parser.error(str(error))
 
 def inspect_container(image: str):
     info = inspect_image(image)
