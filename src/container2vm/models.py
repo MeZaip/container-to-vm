@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 @dataclass
 class VMConfig:
     hostname: str = "container-vm"
-    username: str | None = None
+    username: str = "user"
     password: str | None = None
 
 

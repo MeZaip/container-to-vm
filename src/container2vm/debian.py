@@ -2,7 +2,9 @@ from pathlib import Path
 import subprocess
 
 from .application import install_container
-from .models import VMConfig
+from .models import VMConfig, ContainerConfig
+from.systemd import install_container_service
+
 
 DEBIAN_RELEASE = "bookworm"
 DEBIAN_MIRROR = "http://deb.debian.org/debian"
@@ -53,9 +55,11 @@ def install_packages(rootfs: Path) -> None:
                 "install",
                 "-y",
                 "linux-image-amd64",
+                "grub-pc",
                 "systemd",
                 "systemd-sysv",
                 "iproute2",
+                "sudo",
             ],
             check=True,
         )
@@ -68,9 +72,6 @@ def install_packages(rootfs: Path) -> None:
             )
 
 def create_user(rootfs: Path, config: VMConfig) -> None:
-    if not config.username:
-        return
-
     subprocess.run(
         [
             "chroot",
@@ -79,6 +80,8 @@ def create_user(rootfs: Path, config: VMConfig) -> None:
             "-m",
             "-s",
             "/bin/bash",
+            "-G",
+            "sudo",
             config.username,
         ],
         check=True,
@@ -109,6 +112,37 @@ def configure_system(
         "127.0.0.1 localhost\n"
         f"127.0.1.1 {config.hostname}\n",
         encoding="utf-8",
+    )
+
+    network_dir = rootfs / "etc/systemd/network"
+    network_dir.mkdir(parents=True, exist_ok=True)
+
+    (network_dir / "20-ens3.network").write_text(
+        "[Match]\n"
+        "Name=ens3\n\n"
+        "[Network]\n"
+        "DHCP=yes\n",
+        encoding="utf-8",
+    )
+
+    network_target = (
+        rootfs
+        / "etc/systemd/system/multi-user.target.wants/systemd-networkd.service"
+    )
+
+    network_target.parent.mkdir(parents=True, exist_ok=True)
+
+    network_service = Path(
+        "/lib/systemd/system/systemd-networkd.service"
+    )
+
+    if not network_service.exists():
+        raise RuntimeError(
+            "systemd-networkd.service not found in rootfs."
+        )
+
+    network_target.symlink_to(
+        "/lib/systemd/system/systemd-networkd.service"
     )
 
     create_user(rootfs, config)
@@ -165,13 +199,18 @@ def build_base_rootfs(
 def build_final_rootfs(
     container_rootfs: Path,
     output_rootfs: Path,
-    config,
-    vm_config: VMConfig | None = None,
+    config: ContainerConfig,
+    vm_config: VMConfig,
 ) -> None:
     build_rootfs(output_rootfs, vm_config)
 
     install_container(
         container_rootfs,
+        output_rootfs,
+        config,
+    )
+
+    install_container_service(
         output_rootfs,
         config,
     )

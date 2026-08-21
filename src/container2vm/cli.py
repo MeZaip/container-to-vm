@@ -7,6 +7,7 @@ from .debian import build_rootfs, build_final_rootfs
 from .disk import build_disk
 from .models import VMConfig
 import shutil
+import getpass
 
 def main():
     parser = argparse.ArgumentParser(
@@ -51,6 +52,12 @@ def main():
         help="Output QCOW2 image.",
     )
 
+    build_parser.add_argument(
+        "--user",
+        default="user",
+        help="Username for the VM.",
+    )
+
     convert_parser = subparsers.add_parser(
         "convert",
         help="Convert a container image into a VM image.",
@@ -65,6 +72,12 @@ def main():
         "--output",
         required=True,
         help="Output QCOW2 image.",
+    )
+
+    convert_parser.add_argument(
+        "--user",
+        default="user",
+        help="Username for the VM.",
     )
 
     args = parser.parse_args()
@@ -104,6 +117,17 @@ def main():
     elif args.command == "convert":
         output = Path(args.output).resolve()
 
+        password = getpass.getpass("Password: ")
+        confirm_password = getpass.getpass("Confirm password: ")
+
+        if password != confirm_password:
+            parser.error("Passwords do not match.")
+
+        vm_config = VMConfig(
+            username=args.user,
+            password=password,
+        )
+
         work_dir = output.parent / f".{output.stem}-work"
         container_rootfs = work_dir / "container-rootfs"
         vm_rootfs = work_dir / "vm-rootfs"
@@ -120,7 +144,7 @@ def main():
                 container_rootfs,
                 vm_rootfs,
                 info.config,
-                VMConfig(),
+                vm_config,
             )
 
             print("[4/4] Creating QCOW2 image...")
