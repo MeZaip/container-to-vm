@@ -23,12 +23,19 @@ def install_container_service(
     lines = [
         "[Unit]",
         "Description=Containerized application",
-        "After=network-online.target",
+        "After=network-online.target serial-getty@ttyS0.service",
         "Wants=network-online.target",
+        "Conflicts=serial-getty@ttyS0.service",
         "",
         "[Service]",
         "Type=simple",
         f"ExecStart={exec_start}",
+        "StandardInput=tty",
+        "StandardOutput=tty",
+        "StandardError=tty",
+        "TTYPath=/dev/ttyS0",
+        "TTYReset=yes",
+        "TTYVHangup=yes",
         "Restart=always",
     ]
 

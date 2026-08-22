@@ -8,6 +8,7 @@ from .disk import build_disk
 from .models import VMConfig
 import shutil
 import getpass
+from .ova import build_ova
 
 def main():
     parser = argparse.ArgumentParser(
@@ -71,7 +72,7 @@ def main():
     convert_parser.add_argument(
         "--output",
         required=True,
-        help="Output QCOW2 image.",
+        help="Output VM image (.qcow2 or .ova).",
     )
 
     convert_parser.add_argument(
@@ -117,7 +118,10 @@ def main():
     elif args.command == "convert":
         output = Path(args.output).resolve()
 
-        password = getpass.getpass("Password: ")
+        if output.suffix.lower() not in {".qcow2", ".ova"}:
+            parser.error("Output must have .qcow2 or .ova extension.")
+
+        password = getpass.getpass(f"VM Password for user {args.user}: ")
         confirm_password = getpass.getpass("Confirm password: ")
 
         if password != confirm_password:
@@ -147,8 +151,33 @@ def main():
                 vm_config,
             )
 
-            print("[4/4] Creating QCOW2 image...")
-            build_disk(vm_rootfs, output)
+            if output.suffix.lower() == ".qcow2":
+                print("[4/4] Creating QCOW2 image...")
+                build_disk(vm_rootfs, output)
+
+            else:
+                print("[4/4] Creating OVA image...")
+
+                vmdk = output.parent / f"{output.stem}.vmdk"
+                disk_format = "monolithicSparse"
+
+                try:
+                    build_disk(
+                        vm_rootfs,
+                        vmdk,
+                    )
+
+                    build_ova(
+                        vmdk=vmdk,
+                        output=output,
+                        vm_name=vm_config.hostname,
+                        memory_mb=1024,
+                        cpus=1,
+                        disk_format=disk_format,
+                    )
+
+                finally:
+                    vmdk.unlink(missing_ok=True)
 
             print(f"VM image created: {output}")
 

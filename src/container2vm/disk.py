@@ -55,6 +55,23 @@ def partition_image(image: Path) -> None:
         check=True,
     )
 
+def convert_raw_to_vmdk(
+    raw_image: Path,
+    output: Path,
+) -> None:
+    subprocess.run(
+        [
+            "qemu-img",
+            "convert",
+            "-f",
+            "raw",
+            "-O",
+            "vmdk",
+            str(raw_image),
+            str(output),
+        ],
+        check=True,
+    )
 
 def attach_loop_device(image: Path) -> str:
     result = subprocess.run(
@@ -74,9 +91,6 @@ def attach_loop_device(image: Path) -> str:
 
 
 def get_partition(loop_device: str) -> str:
-    if loop_device[-1].isdigit():
-        return f"{loop_device}p1"
-
     return f"{loop_device}p1"
 
 
@@ -121,6 +135,7 @@ def copy_rootfs(
         check=True,
     )
 
+
 def create_grub_config(mount_point: Path) -> None:
     grub_dir = mount_point / "boot/grub"
     grub_dir.mkdir(parents=True, exist_ok=True)
@@ -130,15 +145,20 @@ def create_grub_config(mount_point: Path) -> None:
     )
 
     if not kernels:
-        raise RuntimeError("No Linux kernel found in root filesystem.")
+        raise RuntimeError(
+            "No Linux kernel found in root filesystem."
+        )
 
     kernel = kernels[-1].name
+
     initrds = sorted(
         (mount_point / "boot").glob("initrd.img-*")
     )
 
     if not initrds:
-        raise RuntimeError("No initramfs found in root filesystem.")
+        raise RuntimeError(
+            "No initramfs found in root filesystem."
+        )
 
     initrd = initrds[-1].name
 
@@ -156,6 +176,7 @@ menuentry 'Container VM' {{
         config,
         encoding="utf-8",
     )
+
 
 def install_grub(
     loop_device: str,
@@ -188,16 +209,18 @@ def detach_loop_device(loop_device: str) -> None:
     )
 
 
-def build_disk(
+def create_bootable_raw_disk(
     rootfs: Path,
-    output: Path,
+    raw_image: Path,
     size: str = "4G",
 ) -> None:
-    output = output.resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
+    raw_image = raw_image.resolve()
+    raw_image.parent.mkdir(parents=True, exist_ok=True)
 
-    raw_image = output.with_suffix(".raw")
-    mount_point = output.parent / f".{output.stem}-mount"
+    mount_point = (
+        raw_image.parent
+        / f".{raw_image.stem}-mount"
+    )
 
     loop_device = None
 
@@ -225,6 +248,7 @@ def build_disk(
         print("  Copying root filesystem...")
         copy_rootfs(rootfs, mount_point)
 
+        print("  Creating GRUB configuration...")
         create_grub_config(mount_point)
 
         print("  Installing GRUB...")
@@ -237,20 +261,73 @@ def build_disk(
         if loop_device is not None:
             detach_loop_device(loop_device)
 
-    print("  Converting raw image to QCOW2...")
 
-    subprocess.run(
-        [
-            "qemu-img",
-            "convert",
-            "-f",
-            "raw",
-            "-O",
-            "qcow2",
-            str(raw_image),
-            str(output),
-        ],
-        check=True,
-    )
+def convert_image(
+    source: Path,
+    output: Path,
+    output_format: str,
+) -> None:
+    command = [
+        "qemu-img",
+        "convert",
+        "-f",
+        "raw",
+        "-O",
+        output_format,
+    ]
 
-    raw_image.unlink()
+    if output_format == "vmdk":
+        command.extend(["-o", "subformat=monolithicSparse"])
+
+    command.extend([
+        str(source),
+        str(output),
+    ])
+
+    subprocess.run(command, check=True)
+
+
+def build_disk(
+    rootfs: Path,
+    output: Path,
+    size: str = "4G",
+    keep_raw: bool = False,
+) -> Path:
+    output = output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    raw_image = output.parent / f".{output.stem}.raw"
+
+    try:
+        create_bootable_raw_disk(
+            rootfs,
+            raw_image,
+            size,
+        )
+
+        output_format = output.suffix.lstrip(".").lower()
+
+        if output_format not in {"qcow2", "vmdk"}:
+            raise ValueError(
+                f"Unsupported disk format: {output_format}"
+            )
+
+        print(
+            f"  Converting raw image to {output_format.upper()}..."
+        )
+
+        convert_image(
+            raw_image,
+            output,
+            output_format,
+        )
+
+        if keep_raw:
+            return raw_image
+
+        return output
+
+    finally:
+        pass
+        if raw_image.exists() and not keep_raw:
+            raw_image.unlink()

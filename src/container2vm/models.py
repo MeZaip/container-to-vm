@@ -6,6 +6,9 @@ class VMConfig:
     hostname: str = "container-vm"
     username: str = "user"
     password: str | None = None
+    memory_mb: int = 1024
+    cpus: int = 1
+    disk_size: str = "4G"
 
 
 @dataclass

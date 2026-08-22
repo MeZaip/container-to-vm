@@ -3,40 +3,14 @@ import subprocess
 
 from .application import install_container
 from .models import VMConfig, ContainerConfig
-from.systemd import install_container_service
-
+from .systemd import install_container_service
+from .mounts import configure_container_mounts, mounted_rootfs
 
 DEBIAN_RELEASE = "bookworm"
 DEBIAN_MIRROR = "http://deb.debian.org/debian"
 
 def install_packages(rootfs: Path) -> None:
-    mounts = [
-        ("/dev", rootfs / "dev", "--bind"),
-        ("/dev/pts", rootfs / "dev/pts", "--bind"),
-        ("/proc", rootfs / "proc", "-t proc"),
-        ("/sys", rootfs / "sys", "-t sysfs"),
-    ]
-
-    mounted = []
-
-    try:
-        for source, target, option in mounts:
-            target.mkdir(parents=True, exist_ok=True)
-
-            if option.startswith("-t"):
-                filesystem = option.split()[1]
-                subprocess.run(
-                    ["mount", "-t", filesystem, source, str(target)],
-                    check=True,
-                )
-            else:
-                subprocess.run(
-                    ["mount", "--bind", source, str(target)],
-                    check=True,
-                )
-
-            mounted.append(target)
-
+    with mounted_rootfs(rootfs):
         subprocess.run(
             [
                 "chroot",
@@ -63,13 +37,6 @@ def install_packages(rootfs: Path) -> None:
             ],
             check=True,
         )
-
-    finally:
-        for target in reversed(mounted):
-            subprocess.run(
-                ["umount", str(target)],
-                check=False,
-            )
 
 def create_user(rootfs: Path, config: VMConfig) -> None:
     subprocess.run(
@@ -132,8 +99,8 @@ def configure_system(
 
     network_target.parent.mkdir(parents=True, exist_ok=True)
 
-    network_service = Path(
-        "/lib/systemd/system/systemd-networkd.service"
+    network_service = (
+        rootfs / "lib/systemd/system/systemd-networkd.service"
     )
 
     if not network_service.exists():
@@ -145,6 +112,37 @@ def configure_system(
         "/lib/systemd/system/systemd-networkd.service"
     )
 
+    grub_config = rootfs / "etc/default/grub"
+
+    grub_config.write_text(
+        'GRUB_DEFAULT=0\n'
+        'GRUB_TIMEOUT=0\n'
+        'GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"\n',
+        encoding="utf-8",
+    )
+
+    with mounted_rootfs(rootfs):
+        subprocess.run(
+            [
+                "chroot",
+                str(rootfs),
+                "update-grub",
+            ],
+            check=True,
+        )
+
+    serial_getty = (
+        rootfs
+        / "etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service"
+    )
+
+    serial_getty.parent.mkdir(parents=True, exist_ok=True)
+
+    serial_getty.symlink_to(
+        "/lib/systemd/system/serial-getty@.service"
+    )
+
+    configure_container_mounts(rootfs)
     create_user(rootfs, config)
 
 
