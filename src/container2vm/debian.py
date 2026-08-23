@@ -66,6 +66,22 @@ def create_user(rootfs: Path, config: VMConfig) -> None:
             check=True,
         )
 
+def configure_network(rootfs: Path) -> None:
+    network_dir = rootfs / "etc/systemd/network"
+    network_dir.mkdir(parents=True, exist_ok=True)
+
+    network_file = network_dir / "20-enp0s3.network"
+
+    network_file.write_text(
+        """[Match]
+Name=enp0s3
+
+[Network]
+DHCP=yes
+""",
+        encoding="utf-8",
+    )
+
 def configure_system(
     rootfs: Path,
     config: VMConfig,
@@ -143,6 +159,7 @@ def configure_system(
     )
 
     configure_container_mounts(rootfs)
+    configure_network(rootfs)
     create_user(rootfs, config)
 
 

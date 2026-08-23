@@ -11,6 +11,8 @@ def install_container_service(
     service_dir = rootfs / "etc/systemd/system"
     service_dir.mkdir(parents=True, exist_ok=True)
 
+    (rootfs / "var/log/container").mkdir(parents=True, exist_ok=True)
+
     command = [
         "/usr/sbin/chroot",
         "/opt/container",
@@ -23,19 +25,16 @@ def install_container_service(
     lines = [
         "[Unit]",
         "Description=Containerized application",
-        "After=network-online.target serial-getty@ttyS0.service",
+        "After=network-online.target container-mounts.service",
         "Wants=network-online.target",
-        "Conflicts=serial-getty@ttyS0.service",
+        "Requires=container-mounts.service",
         "",
         "[Service]",
         "Type=simple",
         f"ExecStart={exec_start}",
-        "StandardInput=tty",
-        "StandardOutput=tty",
-        "StandardError=tty",
-        "TTYPath=/dev/ttyS0",
-        "TTYReset=yes",
-        "TTYVHangup=yes",
+        "StandardInput=null",
+        "StandardOutput=append:/var/log/container/stdout.log",
+        "StandardError=append:/var/log/container/stderr.log",
         "Restart=always",
     ]
 

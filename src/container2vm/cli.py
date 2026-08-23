@@ -121,7 +121,7 @@ def main():
         if output.suffix.lower() not in {".qcow2", ".ova"}:
             parser.error("Output must have .qcow2 or .ova extension.")
 
-        password = getpass.getpass(f"VM Password for user {args.user}: ")
+        password = getpass.getpass(f"VM Password for '{args.user}': ")
         confirm_password = getpass.getpass("Confirm password: ")
 
         if password != confirm_password:

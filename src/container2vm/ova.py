@@ -143,16 +143,6 @@ def create_ovf(
                 <rasd:InstanceID>5</rasd:InstanceID>
                 <rasd:ResourceType>10</rasd:ResourceType>
             </Item>
-
-            <Item>
-                <rasd:Address>0</rasd:Address>
-                <rasd:Description>Serial Port</rasd:Description>
-                <rasd:ElementName>Serial Port 0</rasd:ElementName>
-                <rasd:InstanceID>6</rasd:InstanceID>
-                <rasd:ResourceSubType>16550A</rasd:ResourceSubType>
-                <rasd:ResourceType>21</rasd:ResourceType>
-            </Item>
-
         </VirtualHardwareSection>
     </VirtualSystem>
 </Envelope>

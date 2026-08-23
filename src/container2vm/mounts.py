@@ -55,7 +55,6 @@ def configure_container_mounts(rootfs: Path) -> None:
     service_dir.mkdir(parents=True, exist_ok=True)
 
     service = service_dir / "container-mounts.service"
-
     service.write_text(
         """[Unit]
 Description=Container filesystem mounts
@@ -64,10 +63,13 @@ After=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/mount --bind /dev /opt/container/dev
-ExecStart=/bin/mount --bind /dev/pts /opt/container/dev/pts
+ExecStartPre=/bin/mkdir -p /opt/container/dev
+ExecStart=/bin/mount --rbind /dev /opt/container/dev
+ExecStartPre=/bin/mkdir -p /opt/container/proc
 ExecStart=/bin/mount -t proc proc /opt/container/proc
+ExecStartPre=/bin/mkdir -p /opt/container/sys
 ExecStart=/bin/mount -t sysfs sysfs /opt/container/sys
+ExecStartPre=/bin/mkdir -p /opt/container/run
 ExecStart=/bin/mount --bind /run /opt/container/run
 RemainAfterExit=yes
 
