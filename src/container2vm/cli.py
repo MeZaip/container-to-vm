@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 
 from .container import extract_image, inspect_image
+from .checks import run_environment_check
 from .debian import build_rootfs, build_final_rootfs
 from .disk import build_disk
 from .models import VMConfig
@@ -17,6 +18,11 @@ def main():
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser(
+        "check",
+        help="Check whether the host can build VM images.",
+    )
 
     inspect_parser = subparsers.add_parser(
         "inspect",
@@ -83,7 +89,10 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "inspect":
+    if args.command == "check":
+        if not run_environment_check():
+            raise SystemExit(1)
+    elif args.command == "inspect":
         try:
             inspect_container(args.image)
         except Exception as error:
