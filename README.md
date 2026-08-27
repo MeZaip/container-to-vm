@@ -155,6 +155,7 @@ tests/
   are configured in the virtualization product.
 - Images that require special kernel modules, Docker privileges, or a different
   CPU architecture may not run in the generated VM.
+- debootstrap will not work in WSL if the VM file output is somewhere in /mnt/*. Please output the file somewhere else in the Linux filesystem (`--output ~/vm.qcow2`, or `/tmp/vm.qcow2`).
 
 ## License
 
