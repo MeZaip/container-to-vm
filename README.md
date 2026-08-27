@@ -24,7 +24,7 @@ bootable Debian VM
 The project currently supports:
 
 - Linux Docker images for the amd64 / x86_64 architecture;
-- a Debian Bookworm VM base;
+- a Debian VM base;
 - QCOW2 and OVA output;
 - container `Entrypoint`, `Cmd`, environment variables, and exposed-port
   metadata;
@@ -101,7 +101,7 @@ Examples for `<docker_image_or_container>`:
 Extract its filesystem without creating a VM:
 
 ```sh
-sudo container2vm extract <docker_image_or_container> ./nginx-rootfs
+sudo container2vm extract <docker_image_or_container> ./rootfs
 ```
 
 Create a minimal Debian base VM:
@@ -110,16 +110,18 @@ Create a minimal Debian base VM:
 sudo container2vm build-base --output debian-base.qcow2
 ```
 
+**You do NOT have to build base or extract manually. Run one of the following commands to convert your docker container or image:**
+
 Convert an image or container to QCOW2:
 
 ```sh
-sudo container2vm convert <docker_image_or_container> --output nginx.qcow2
+sudo container2vm convert <docker_image_or_container> --output containervm.qcow2
 ```
 
 Convert an image or container to an OVA appliance:
 
 ```sh
-sudo container2vm convert <docker_image_or_container> --output nginx.ova
+sudo container2vm convert <docker_image_or_container> --output containervm.ova
 ```
 
 `convert` asks for the password of the VM user. The OVA can be imported into
