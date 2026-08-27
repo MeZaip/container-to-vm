@@ -33,6 +33,26 @@ class InspectContainerOrImageTests(unittest.TestCase):
         self.assertEqual(info.config.env["A"], "B")
         self.assertIn("/data", info.config.volumes)
 
+    @patch("container2vm.container.subprocess.run")
+    def test_falls_back_to_image_command_when_container_has_only_it_flags(self, mock_run):
+        container_inspect = MagicMock(
+            returncode=0,
+            stdout='[{"Id":"cid","Path":"docker-entrypoint.sh","Args":["-it"],'
+            '"Config":{"Image":"nginx:latest","Env":["A=B"],"WorkingDir":"/","User":"root"}}]',
+        )
+        image_inspect = MagicMock(
+            returncode=0,
+            stdout='[{"Id":"imgid","Architecture":"amd64","Os":"linux","Size":123,'
+            '"Config":{"Entrypoint":["/docker-entrypoint.sh"],'
+            '"Cmd":["nginx","-g","daemon off;"]}}]',
+        )
+        mock_run.side_effect = [container_inspect, image_inspect]
+
+        info = inspect_container_or_image("nginx-live")
+
+        self.assertEqual(info.config.entrypoint, ["/docker-entrypoint.sh"])
+        self.assertEqual(info.config.cmd, ["nginx", "-g", "daemon off;"])
+
 
 class ExtractContainerOrImageTests(unittest.TestCase):
     @patch("container2vm.container._copy_container_mounts")

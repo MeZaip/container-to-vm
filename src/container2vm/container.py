@@ -6,6 +6,15 @@ from pathlib import Path
 
 from .models import ContainerConfig, ContainerInfo
 
+INTERACTIVE_RUNTIME_ARGS = {
+    "-i",
+    "-t",
+    "-it",
+    "-ti",
+    "--interactive",
+    "--tty",
+}
+
 
 def _parse_environment(config: dict) -> dict[str, str]:
     environment = {}
@@ -54,16 +63,46 @@ def _resolve_reference(reference: str) -> tuple[str, dict]:
     )
 
 
+def _strip_interactive_args(args: list[str]) -> list[str]:
+    return [
+        value
+        for value in args
+        if value not in INTERACTIVE_RUNTIME_ARGS
+    ]
+
+
 def inspect_container_or_image(reference: str) -> ContainerInfo:
     reference_type, data = _resolve_reference(reference)
     config = data.get("Config", {})
+    image_data = data
 
     entrypoint = config.get("Entrypoint") or []
     cmd = config.get("Cmd") or []
 
+    if reference_type == "container":
+        image_reference = config.get("Image") or data.get("Image")
+        inspected_image = _inspect("image", image_reference or "")
+
+        if inspected_image is not None:
+            image_data = inspected_image
+
     if reference_type == "container" and data.get("Path"):
         entrypoint = [data["Path"]]
-        cmd = data.get("Args") or []
+
+        container_args = data.get("Args") or []
+        sanitized_args = _strip_interactive_args(container_args)
+
+        if sanitized_args:
+            cmd = sanitized_args
+        else:
+            image_config = image_data.get("Config", {})
+            image_entrypoint = image_config.get("Entrypoint") or []
+            image_cmd = image_config.get("Cmd") or []
+
+            if image_entrypoint:
+                entrypoint = image_entrypoint
+
+            cmd = image_cmd
 
     volume_paths = set((config.get("Volumes") or {}).keys())
 
@@ -73,15 +112,6 @@ def inspect_container_or_image(reference: str) -> ContainerInfo:
 
             if destination:
                 volume_paths.add(destination)
-
-    image_data = data
-
-    if reference_type == "container":
-        image_reference = config.get("Image") or data.get("Image")
-        inspected_image = _inspect("image", image_reference or "")
-
-        if inspected_image is not None:
-            image_data = inspected_image
 
     container_config = ContainerConfig(
         entrypoint=entrypoint,
