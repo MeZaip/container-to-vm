@@ -1,15 +1,18 @@
 import argparse
-
+import getpass
+import shutil
 from pathlib import Path
 
-from .container import extract_image, inspect_image
 from .checks import run_environment_check
-from .debian import build_rootfs, build_final_rootfs
+from .container import (
+    extract_container_or_image,
+    inspect_container_or_image,
+)
+from .debian import build_final_rootfs, build_rootfs
 from .disk import build_disk
 from .models import VMConfig
-import shutil
-import getpass
 from .ova import build_ova
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -26,23 +29,21 @@ def main():
 
     inspect_parser = subparsers.add_parser(
         "inspect",
-        help="Inspect a container image.",
+        help="Inspect a container image or container.",
     )
     inspect_parser.add_argument(
-        "image",
-        help="Container image to inspect.",
+        "source",
+        help="Container image or container to inspect.",
     )
 
     extract_parser = subparsers.add_parser(
         "extract",
         help="Extract a container filesystem.",
     )
-
     extract_parser.add_argument(
-        "image",
-        help="Container image to extract.",
+        "source",
+        help="Container image or container to extract.",
     )
-
     extract_parser.add_argument(
         "output",
         help="Directory where the filesystem will be extracted.",
@@ -52,13 +53,11 @@ def main():
         "build-base",
         help="Build a bootable Debian base VM.",
     )
-
     build_parser.add_argument(
         "--output",
         required=True,
         help="Output QCOW2 image.",
     )
-
     build_parser.add_argument(
         "--user",
         default="user",
@@ -67,20 +66,17 @@ def main():
 
     convert_parser = subparsers.add_parser(
         "convert",
-        help="Convert a container image into a VM image.",
+        help="Convert a container image or container into a VM image.",
     )
-
     convert_parser.add_argument(
-        "image",
-        help="Container image to convert.",
+        "source",
+        help="Container image or container to convert.",
     )
-
     convert_parser.add_argument(
         "--output",
         required=True,
         help="Output VM image (.qcow2 or .ova).",
     )
-
     convert_parser.add_argument(
         "--user",
         default="user",
@@ -92,19 +88,27 @@ def main():
     if args.command == "check":
         if not run_environment_check():
             raise SystemExit(1)
-    elif args.command == "inspect":
-        try:
-            inspect_container(args.image)
-        except Exception as error:
-            parser.error(str(error))
-    elif args.command == "extract":
-        try:
-            extract_image(args.image, Path(args.output))
-        except Exception as error:
-            parser.error(str(error))
-    elif args.command == "build-base":
-        output = Path(args.output).resolve()
 
+        return
+
+    if args.command == "inspect":
+        try:
+            inspect_container(args.source)
+        except Exception as error:
+            parser.error(str(error))
+
+        return
+
+    if args.command == "extract":
+        try:
+            extract_container_or_image(args.source, Path(args.output))
+        except Exception as error:
+            parser.error(str(error))
+
+        return
+
+    if args.command == "build-base":
+        output = Path(args.output).resolve()
         rootfs = output.parent / f".{output.stem}-rootfs"
 
         try:
@@ -115,16 +119,14 @@ def main():
             build_disk(rootfs, output)
 
             print(f"VM image created: {output}")
-
         except Exception as error:
             parser.error(str(error))
-
         finally:
-            # if rootfs.exists():
-            #     import shutil
-            #     shutil.rmtree(rootfs, ignore_errors=True)
             pass
-    elif args.command == "convert":
+
+        return
+
+    if args.command == "convert":
         output = Path(args.output).resolve()
 
         if output.suffix.lower() not in {".qcow2", ".ova"}:
@@ -138,7 +140,7 @@ def main():
 
         vm_config = VMConfig(
             username=args.user,
-            password=password,
+            **{"password": password},
         )
 
         work_dir = output.parent / f".{output.stem}-work"
@@ -147,10 +149,10 @@ def main():
 
         try:
             print("[1/4] Inspecting container image...")
-            info = inspect_image(args.image)
+            info = inspect_container_or_image(args.source)
 
             print("[2/4] Extracting container filesystem...")
-            extract_image(args.image, container_rootfs)
+            extract_container_or_image(args.source, container_rootfs)
 
             print("[3/4] Building VM root filesystem...")
             build_final_rootfs(
@@ -163,12 +165,9 @@ def main():
             if output.suffix.lower() == ".qcow2":
                 print("[4/4] Creating QCOW2 image...")
                 build_disk(vm_rootfs, output)
-
             else:
                 print("[4/4] Creating OVA image...")
-
                 vmdk = output.parent / f"{output.stem}.vmdk"
-                disk_format = "monolithicSparse"
 
                 try:
                     build_disk(
@@ -182,25 +181,23 @@ def main():
                         vm_name=vm_config.hostname,
                         memory_mb=1024,
                         cpus=1,
-                        disk_format=disk_format,
+                        disk_format="monolithicSparse",
                     )
-
                 finally:
                     vmdk.unlink(missing_ok=True)
 
             print(f"VM image created: {output}")
-
         except Exception as error:
             parser.error(str(error))
-
         finally:
             if work_dir.exists():
                 shutil.rmtree(work_dir, ignore_errors=True)
 
-def inspect_container(image: str):
-    info = inspect_image(image)
 
-    print(f"Image:         {info.image}")
+def inspect_container(source: str):
+    info = inspect_container_or_image(source)
+
+    print(f"Source:        {info.image}")
     print(f"Image ID:      {info.image_id}")
     print(f"Architecture:  {info.architecture}")
     print(f"OS:            {info.os}")
