@@ -1,16 +1,16 @@
 # container-to-vm
 
-Convert a Linux Docker/OCI image into a bootable Debian virtual machine.
+Convert a Linux Docker/OCI image or container into a bootable Debian virtual machine.
 
-`container2vm` extracts an image filesystem, creates a minimal Debian VM around
+`container2vm` extracts a container filesystem, creates a minimal Debian VM around
 it, configures a systemd service for the container command, and exports the
 result as either a QCOW2 disk image or an OVA appliance.
 
 ```text
-Docker/OCI image
+Docker/OCI image or container
 	  |
 	  v
-image filesystem + metadata
+filesystem + metadata
 	  |
 	  v
 bootable Debian VM
@@ -26,7 +26,7 @@ The project currently supports:
 - Linux Docker images for the amd64 / x86_64 architecture;
 - a Debian Bookworm VM base;
 - QCOW2 and OVA output;
-- Docker image `Entrypoint`, `Cmd`, environment variables, and exposed-port
+- container `Entrypoint`, `Cmd`, environment variables, and exposed-port
   metadata;
 - Linux and WSL as build environments.
 
@@ -88,16 +88,20 @@ to the Docker daemon.
 
 ## Usage
 
-Inspect an available Docker image:
+Inspect an available Docker image or container:
 
 ```sh
-sudo container2vm inspect <docker_image>
+sudo container2vm inspect <docker_image_or_container>
 ```
+
+Examples for `<docker_image_or_container>`:
+- image: `redis:7`
+- container: `redis-prod` or a container ID
 
 Extract its filesystem without creating a VM:
 
 ```sh
-sudo container2vm extract <docker_image> ./nginx-rootfs
+sudo container2vm extract <docker_image_or_container> ./nginx-rootfs
 ```
 
 Create a minimal Debian base VM:
@@ -106,23 +110,23 @@ Create a minimal Debian base VM:
 sudo container2vm build-base --output debian-base.qcow2
 ```
 
-Convert an image to QCOW2:
+Convert an image or container to QCOW2:
 
 ```sh
-sudo container2vm convert <docker_image> --output nginx.qcow2
+sudo container2vm convert <docker_image_or_container> --output nginx.qcow2
 ```
 
-Convert an image to an OVA appliance:
+Convert an image or container to an OVA appliance:
 
 ```sh
-sudo container2vm convert <docker_image> --output nginx.ova
+sudo container2vm convert <docker_image_or_container> --output nginx.ova
 ```
 
 `convert` asks for the password of the VM user. The OVA can be imported into
 VirtualBox or another compatible virtualization product. CPU, memory, and other
 VM settings can be adjusted after import.
 
-`<docker_image>` is an image available from the `docker images` list.
+For container input, conversion includes writable-layer changes (for example, files written by Redis in-container). Mounted Docker volume data is also copied into the resulting VM root filesystem at each mount destination.
 
 ## Project layout
 
@@ -146,11 +150,12 @@ tests/
 
 - ARM and Windows container images are not supported.
 - The generated VM is BIOS/MBR based.
-- Docker volumes are not transferred as persistent data volumes.
+- Docker volumes are copied into the VM filesystem, but are no longer separate Docker-managed persistent volumes.
 - Exposed ports are recorded as image metadata; networking and port forwarding
   are configured in the virtualization product.
 - Images that require special kernel modules, Docker privileges, or a different
   CPU architecture may not run in the generated VM.
+- debootstrap will not work in WSL if the VM file output is somewhere in /mnt/*. Please output the file somewhere else in the Linux filesystem (`--output ~/vm.qcow2`, or `/tmp/vm.qcow2`).
 
 ## License
 
