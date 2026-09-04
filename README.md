@@ -130,23 +130,10 @@ VM settings can be adjusted after import.
 
 For container input, conversion includes writable-layer changes (for example, files written by Redis in-container). Mounted Docker volume data is also copied into the resulting VM root filesystem at each mount destination.
 
-## Project layout
+> [!NOTE]
+> Building the VM filesystem on WSL will fail if you build it inside `/mnt/*`.
+> Please use `/tmp/vm_image.qcow2` or another Linux filesystem location.
 
-```text
-src/container2vm/
-  cli.py            Command-line interface
-  checks.py         Host environment validation
-  container.py      Docker image inspection and extraction
-  debian.py         Debian root filesystem creation and configuration
-  disk.py           Partitioning, bootloader, and disk-image conversion
-  systemd.py        Generated service for the container command
-  ova.py            OVA/OVF and manifest generation
-scripts/
-  install-system.sh Installs the system-wide command symlink
-tests/
-  test_checks.py    Environment-check tests
-  test_cli.py       CLI tests
-```
 
 ## Limitations
 
@@ -157,7 +144,6 @@ tests/
   are configured in the virtualization product.
 - Images that require special kernel modules, Docker privileges, or a different
   CPU architecture may not run in the generated VM.
-- debootstrap will not work in WSL if the VM file output is somewhere in /mnt/*. Please output the file somewhere else in the Linux filesystem (`--output ~/vm.qcow2`, or `/tmp/vm.qcow2`).
 
 ## License
 
